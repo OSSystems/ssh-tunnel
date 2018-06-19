@@ -1,35 +1,33 @@
 package main
 
 import (
+	"bytes"
 	"fmt"
 	"log"
 	"os"
 	"os/exec"
+	"strings"
 
 	mqtt "github.com/eclipse/paho.mqtt.golang"
+	shellwords "github.com/mattn/go-shellwords"
 	"github.com/spf13/cobra"
+	"github.com/spf13/viper"
 )
 
 func main() {
-	var deviceID string
-	var mqttServer string
-	var sshServer string
-	var sshServerPort string
-	var identityFile string
-
 	var rootCmd = &cobra.Command{
 		Use: "ssh-tunnel",
 		Run: func(cmd *cobra.Command, args []string) {
 		},
 	}
 
-	rootCmd.Flags().StringVarP(&deviceID, "device-id", "d", "", "device identity")
-	rootCmd.Flags().StringVarP(&mqttServer, "mqtt-server", "m", "", "mqtt server")
-	rootCmd.Flags().StringVarP(&sshServer, "ssh-server", "s", "", "ssh server")
-	rootCmd.Flags().StringVarP(&sshServerPort, "ssh-server-port", "p", "2221", "ssh server port")
-	rootCmd.Flags().StringVarP(&identityFile, "identity-file", "i", "", "identity file")
+	viper.AutomaticEnv()
 
-	rootCmd.MarkFlagRequired("device-id")
+	deviceID := getDeviceID(viper.GetString("DEVICE_ID"))
+	mqttServer := viper.GetString("MQTT_SERVER")
+	sshServer := viper.GetString("SSH_SERVER")
+	sshPort := viper.GetString("SSH_PORT")
+	privateKey := viper.GetString("PRIVATE_KEY")
 
 	if err := rootCmd.Execute(); err != nil {
 		log.Fatal(err)
@@ -62,10 +60,10 @@ func main() {
 
 			args := []string{
 				"ssh",
-				"-i", identityFile,
+				"-i", privateKey,
 				"-o", "StrictHostKeyChecking=no",
 				"-nNT",
-				"-p", sshServerPort,
+				"-p", sshPort,
 				"-R", fmt.Sprintf("%s:localhost:22", port),
 				fmt.Sprintf("ssh@%s", sshServer),
 			}
@@ -78,4 +76,33 @@ func main() {
 	}
 
 	select {}
+}
+
+func getDeviceID(deviceID string) string {
+	parts := strings.Split(deviceID, ":")
+	if len(parts) < 2 {
+		return deviceID
+	}
+
+	switch parts[0] {
+	case "value":
+		return strings.Join(parts[1:], ":")
+	case "exec":
+		args, err := shellwords.Parse(strings.Join(parts[1:], ":"))
+		if err != nil {
+			log.Fatal(err)
+		}
+
+		var out bytes.Buffer
+
+		cmd := exec.Command(args[0], args[1:]...)
+		cmd.Stdout = &out
+		if err := cmd.Run(); err != nil {
+			log.Fatal(err)
+		}
+
+		return out.String()
+	}
+
+	return deviceID
 }
