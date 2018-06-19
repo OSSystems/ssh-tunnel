@@ -101,7 +101,7 @@ func getDeviceID(deviceID string) string {
 			log.Fatal(err)
 		}
 
-		return out.String()
+		return strings.TrimSpace(out.String())
 	}
 
 	return deviceID
