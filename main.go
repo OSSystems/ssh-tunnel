@@ -7,6 +7,7 @@ import (
 	"os"
 	"os/exec"
 	"strings"
+	"time"
 
 	mqtt "github.com/eclipse/paho.mqtt.golang"
 	shellwords "github.com/mattn/go-shellwords"
@@ -46,34 +47,38 @@ func main() {
 	fmt.Printf("device-id=%s\n", deviceID)
 
 	opts := mqtt.NewClientOptions().AddBroker(fmt.Sprintf("tcp://%s", mqttServer))
+	opts.SetAutoReconnect(true)
+	opts.SetConnectionLostHandler(func(client mqtt.Client, err error) {
+		connect(client)
+	})
+	opts.SetOnConnectHandler(func(client mqtt.Client) {
+		if token := client.Subscribe(fmt.Sprintf("device/%s", deviceID), 0, func(client mqtt.Client, msg mqtt.Message) {
+			go func() {
+				port := string(msg.Payload())
+
+				fmt.Printf("reverse port=%s\n", port)
+
+				args := []string{
+					"ssh",
+					"-i", privateKey,
+					"-o", "StrictHostKeyChecking=no",
+					"-nNT",
+					"-p", sshPort,
+					"-R", fmt.Sprintf("%s:localhost:22", port),
+					fmt.Sprintf("ssh@%s", sshServer),
+				}
+
+				cmd := exec.Command(args[0], args[1:]...)
+				_ = cmd.Run()
+			}()
+		}); token.Wait() && token.Error() != nil {
+			log.Fatal(token.Error())
+		}
+	})
 
 	client := mqtt.NewClient(opts)
-	if token := client.Connect(); token.Wait() && token.Error() != nil {
-		log.Fatal(token.Error())
-	}
 
-	if token := client.Subscribe(fmt.Sprintf("device/%s", deviceID), 0, func(client mqtt.Client, msg mqtt.Message) {
-		go func() {
-			port := string(msg.Payload())
-
-			fmt.Printf("reverse port=%s\n", port)
-
-			args := []string{
-				"ssh",
-				"-i", privateKey,
-				"-o", "StrictHostKeyChecking=no",
-				"-nNT",
-				"-p", sshPort,
-				"-R", fmt.Sprintf("%s:localhost:22", port),
-				fmt.Sprintf("ssh@%s", sshServer),
-			}
-
-			cmd := exec.Command(args[0], args[1:]...)
-			_ = cmd.Run()
-		}()
-	}); token.Wait() && token.Error() != nil {
-		log.Fatal(token.Error())
-	}
+	connect(client)
 
 	select {}
 }
@@ -105,4 +110,15 @@ func getDeviceID(deviceID string) string {
 	}
 
 	return deviceID
+}
+
+func connect(client mqtt.Client) {
+	for {
+		if token := client.Connect(); token.Wait() && token.Error() != nil {
+			time.Sleep(time.Second)
+			continue
+		}
+
+		break
+	}
 }
