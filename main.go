@@ -6,6 +6,7 @@ import (
 	"log"
 	"os"
 	"os/exec"
+	"strconv"
 	"strings"
 	"time"
 
@@ -44,6 +45,8 @@ func main() {
 		os.Exit(1)
 	}
 
+	cmds := make(map[int]*exec.Cmd)
+
 	fmt.Printf("device-id=%s\n", deviceID)
 
 	opts := mqtt.NewClientOptions().AddBroker(fmt.Sprintf("tcp://%s", mqttServer))
@@ -52,11 +55,11 @@ func main() {
 		connect(client)
 	})
 	opts.SetOnConnectHandler(func(client mqtt.Client) {
-		if token := client.Subscribe(fmt.Sprintf("device/%s", deviceID), 0, func(client mqtt.Client, msg mqtt.Message) {
+		if token := client.Subscribe(fmt.Sprintf("connect/%s", deviceID), 0, func(client mqtt.Client, msg mqtt.Message) {
 			go func() {
-				port := string(msg.Payload())
+				port, _ := strconv.Atoi(string(msg.Payload()))
 
-				fmt.Printf("reverse port=%s\n", port)
+				fmt.Printf("reverse port=%d\n", port)
 
 				args := []string{
 					"ssh",
@@ -64,13 +67,27 @@ func main() {
 					"-o", "StrictHostKeyChecking=no",
 					"-nNT",
 					"-p", sshPort,
-					"-R", fmt.Sprintf("%s:localhost:22", port),
+					"-R", fmt.Sprintf("%d:localhost:22", port),
 					fmt.Sprintf("ssh@%s", sshServer),
 				}
 
 				cmd := exec.Command(args[0], args[1:]...)
-				_ = cmd.Run()
+				_ = cmd.Start()
+
+				cmds[port] = cmd
 			}()
+		}); token.Wait() && token.Error() != nil {
+			log.Fatal(token.Error())
+		}
+
+		if token := client.Subscribe(fmt.Sprintf("disconnect/%s", deviceID), 0, func(client mqtt.Client, msg mqtt.Message) {
+			port, _ := strconv.Atoi(string(msg.Payload()))
+
+			if cmd, ok := cmds[port]; ok {
+				cmd.Process.Kill()
+				cmd.Wait()
+				delete(cmds, port)
+			}
 		}); token.Wait() && token.Error() != nil {
 			log.Fatal(token.Error())
 		}
