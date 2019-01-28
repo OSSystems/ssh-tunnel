@@ -3,13 +3,13 @@ package main
 import (
 	"bytes"
 	"fmt"
-	"log"
 	"os"
 	"os/exec"
 	"strconv"
 	"strings"
 	"time"
 
+	"github.com/Sirupsen/logrus"
 	mqtt "github.com/eclipse/paho.mqtt.golang"
 	shellwords "github.com/mattn/go-shellwords"
 	"github.com/spf13/cobra"
@@ -32,13 +32,12 @@ func main() {
 	privateKey := viper.GetString("PRIVATE_KEY")
 
 	if err := rootCmd.Execute(); err != nil {
-		log.Fatal(err)
+		logrus.Fatal(err)
 	}
 
 	helpCalled, err := rootCmd.Flags().GetBool("help")
 	if err != nil {
-		log.Fatal(err)
-		os.Exit(1)
+		logrus.Fatal(err)
 	}
 
 	if helpCalled {
@@ -77,7 +76,8 @@ func main() {
 				cmds[port] = cmd
 			}()
 		}); token.Wait() && token.Error() != nil {
-			log.Fatal(token.Error())
+			logrus.Error(token.Error())
+			return
 		}
 
 		if token := client.Subscribe(fmt.Sprintf("disconnect/%s", deviceID), 0, func(client mqtt.Client, msg mqtt.Message) {
@@ -89,7 +89,7 @@ func main() {
 				delete(cmds, port)
 			}
 		}); token.Wait() && token.Error() != nil {
-			log.Fatal(token.Error())
+			logrus.Error(token.Error())
 		}
 	})
 
@@ -112,7 +112,7 @@ func getDeviceID(deviceID string) string {
 	case "exec":
 		args, err := shellwords.Parse(strings.Join(parts[1:], ":"))
 		if err != nil {
-			log.Fatal(err)
+			logrus.Fatal(err)
 		}
 
 		var out bytes.Buffer
@@ -120,7 +120,7 @@ func getDeviceID(deviceID string) string {
 		cmd := exec.Command(args[0], args[1:]...)
 		cmd.Stdout = &out
 		if err := cmd.Run(); err != nil {
-			log.Fatal(err)
+			logrus.Fatal(err)
 		}
 
 		return strings.TrimSpace(out.String())
