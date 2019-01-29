@@ -1,5 +1,5 @@
-hash: fb595c8fa4755db6068c730f2b04fb2dcc769bc9b81aa68aa1a29f15d1c54fd3
-updated: 2019-01-28T09:45:42.354640373-02:00
+hash: b24775529648a94a48ce97512623e1c9881f0ac607cc31be00d73ae9f3f3baba
+updated: 2019-01-29T16:18:50.123631971-02:00
 imports:
 - name: github.com/eclipse/paho.mqtt.golang
   version: 36d01c2b4cbeb3d2a12063e4880ce30800af9560
@@ -21,6 +21,8 @@ imports:
   - json/token
 - name: github.com/inconshreveable/mousetrap
   version: 76626ae9c91c4f2a10f34cad8ce83ea42c93bb75
+- name: github.com/konsorten/go-windows-terminal-sequences
+  version: 5c8c8bd35d3832f5d134ae1e1e375b69a4d25242
 - name: github.com/magiconair/properties
   version: c2353362d570a7bfa228149c62842019201cfb71
 - name: github.com/mattn/go-shellwords
@@ -45,6 +47,11 @@ imports:
   version: 298182f68c66c05229eb03ac171abe6e309ee79a
 - name: github.com/spf13/viper
   version: 2c12c60302a5a0e62ee102ca9bc996277c2f64f5
+- name: golang.org/x/crypto
+  version: 0c41d7ab0a0ee717d4590a44bcb987dfd9e183eb
+  subpackages:
+  - ssh
+  - ssh/terminal
 - name: golang.org/x/net
   version: db08ff08e8622530d9ed3a0e8ac279f6d4c02196
   subpackages:
@@ -55,6 +62,7 @@ imports:
   version: fa43e7bc11baaae89f3f902b2b4d832b68234844
   subpackages:
   - unix
+  - windows
 - name: golang.org/x/text
   version: 4d1c5fb19474adfe9562c9847ba425e7da817e81
   subpackages:
